@@ -22,7 +22,9 @@ def get_updates_json(request):
 def last_update(data):
     results = data['result']
     total_updates = len(results) - 1
-    return results[total_updates]
+    if total_updates < 0:
+    	return None # ЗДЕСЬ ЕЩЁ НЕ ЯСНО
+    return results[total_updates] 
 
 
 def get_string_offset():
@@ -52,33 +54,55 @@ def send_mess(chat, text):
     return response
 
 def work_with_update():
-    response_text = "command was executing successful"
+    response_text = ""
     json_data = get_updates_json(url + 'getUpdates' + get_string_offset())
     text_of_message = first_update(json_data)['message']['text'].encode('utf-8')
+    print(text_of_message)
     if text_of_message == 'top 10':
         print("здесь должен быть запрос к серверу на топ 10")
-        response = urllib2.urlopen('http://localhost:8080/') # change url
+        response = json.load(urllib2.urlopen('http://localhost:8080/news/')) # change url
         print(response)
-        response_text = response.read().decode('utf-8')
+        size = len(response)
+        current = 0
+        while current<size:
+          nick_name = response[current]['name']
+          level = response[current]['level']
+          race = response[current]['race']
+          response_text += nick_name + "  " + str(level) + "  " + race + "\n"
+          current +=1
     elif text_of_message == 'news':
         print("здесь должен быть запрос к серверу на новости")
-        response = urllib2.urlopen('http://localhost:8080/')
+        response = json.load(urllib2.urlopen('http://localhost:8080/news/'))
         print(response)
-        response_text = response.read().decode('utf-8')
+        size = len(response)
+        current = 0
+        while current<size:
+          timestamp = response[current]['timestamp']
+          title = response[current]['title']
+          text = response[current]['text']
+          response_text += title + "\n" + text + "\n" + str(timestamp) + "\n"
+          current +=1
     elif text_of_message == 'commands':
         response_text = "'top 10' for top 10 best players 'news' for news"
     else:
-        response_text = text_of_message + " - it isn't command, type 'commands' for getting list of commands"
+        response_text =" - it isn't command, type 'commands' for getting list of commands"
 
     send_mess(get_chat_id(first_update(json_data)), response_text)
 
 
 def main():
     global offset
-    update_id = first_update(get_updates_json(url + 'getUpdates' + get_string_offset()))['update_id']
-    print(update_id)
-    offset = update_id
-    last_update_id = last_update(get_updates_json(url + 'getUpdates' + get_string_offset()))['update_id']
+    try: 
+      update_id = first_update(get_updates_json(url + 'getUpdates' + get_string_offset()))['update_id']
+      print(update_id)
+      offset = update_id
+    except IndexError:
+      print("empty")
+      update_id = 1
+    last_upd = last_update(get_updates_json(url + 'getUpdates' + get_string_offset()))
+    last_update_id = 0
+    if last_upd != None:
+        last_update_id = last_upd['update_id'] 
     print(last_update_id)
     while update_id < last_update_id:
         work_with_update()
@@ -86,7 +110,12 @@ def main():
         offset += 1
         print (update_id, " ", last_update_id)
     while True:
-        if update_id == last_update(get_updates_json(url + 'getUpdates' + get_string_offset()))['update_id']:
+    	print(offset)
+    	last_upd = last_update(get_updates_json(url + 'getUpdates' + get_string_offset()))
+    	last_update_id = 0
+    	if last_upd != None:
+          last_update_id = last_upd['update_id']
+        if update_id == last_update_id:
             work_with_update()
             update_id += 1
             offset += 1
